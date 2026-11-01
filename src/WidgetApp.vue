@@ -33,6 +33,8 @@ const outputs = computed(() => (results.value || []).filter((r) => r.output).map
 const failed = computed(() => (results.value || []).filter((r) => !r.output));
 
 const mq = window.matchMedia("(prefers-color-scheme: dark)");
+// Windows gets no frosted glass behind the widget (widgets/mod.rs): a fuller background instead
+if (navigator.userAgent.includes("Windows")) document.documentElement.setAttribute("data-os", "windows");
 function applyTheme(theme: string) {
   const dark = theme === "dark" || (theme !== "light" && mq.matches);
   document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
@@ -235,6 +237,10 @@ html, body, #app { background: transparent !important; margin: 0; height: 100%; 
 html[data-theme="dark"] .w { background: rgba(28, 28, 33, 0.58); border-color: rgba(255, 255, 255, 0.10); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04); }
 .w.over { box-shadow: inset 0 0 0 2px var(--acc); background: color-mix(in srgb, var(--acc) 10%, rgba(255, 255, 255, 0.62)); }
 html[data-theme="dark"] .w.over { background: color-mix(in srgb, var(--acc) 14%, rgba(28, 28, 33, 0.58)); }
+html[data-os="windows"] .w { background: rgba(250, 250, 252, 0.94); border-color: rgba(0, 0, 0, 0.10); }
+html[data-os="windows"][data-theme="dark"] .w { background: rgba(32, 32, 38, 0.94); border-color: rgba(255, 255, 255, 0.12); }
+html[data-os="windows"] .w.over { background: color-mix(in srgb, var(--acc) 10%, rgba(250, 250, 252, 0.94)); }
+html[data-os="windows"][data-theme="dark"] .w.over { background: color-mix(in srgb, var(--acc) 14%, rgba(32, 32, 38, 0.94)); }
 
 .w-head { display: flex; align-items: center; gap: 7px; height: 22px; flex: none; cursor: grab; }
 .w-head:active { cursor: grabbing; }

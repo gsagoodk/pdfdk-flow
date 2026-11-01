@@ -39,6 +39,12 @@ pub fn open_window<R: Runtime>(app: &AppHandle<R>, w: &WidgetConfig) -> tauri::R
     if let (Some(x), Some(y)) = (w.x, w.y) {
         builder = builder.position(x, y);
     }
+    // Windows draws a shadow and a thin frame around the whole square window, outside the
+    // rounded corners the page draws
+    #[cfg(target_os = "windows")]
+    {
+        builder = builder.shadow(false);
+    }
     let win = builder.build()?;
 
     // Sit on the desktop like Apple's own widgets: desktop-icon level (under every app window,
@@ -50,7 +56,9 @@ pub fn open_window<R: Runtime>(app: &AppHandle<R>, w: &WidgetConfig) -> tauri::R
         let _ = win.run_on_main_thread(move || unsafe { place_on_desktop(&win2) });
     }
 
-    // the frosted-glass look of the OS's own widgets
+    // the frosted-glass look of the OS's own widgets – on macOS only. Windows' acrylic covers the
+    // square window (a box around the rounded corners) and makes dragging lag on Windows 10; there
+    // the page draws the widget on a transparent window (WidgetApp.vue, html[data-os="windows"]).
     #[cfg(target_os = "macos")]
     {
         use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
@@ -58,22 +66,23 @@ pub fn open_window<R: Runtime>(app: &AppHandle<R>, w: &WidgetConfig) -> tauri::R
             crate::add_log(&format!("Widget {}: no vibrancy ({})", w.id, e));
         }
     }
-    #[cfg(target_os = "windows")]
-    {
-        if window_vibrancy::apply_acrylic(&win, Some((18, 18, 22, 150))).is_err() {
-            let _ = window_vibrancy::apply_blur(&win, Some((18, 18, 22, 150)));
-        }
-    }
-
-    // remember where the user puts it
+    // remember where the user puts it – once it has stopped moving, not on every pixel of a drag
     let app2 = app.clone();
     let id = w.id.clone();
     let win2 = win.clone();
+    let moves = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
     win.on_window_event(move |event| {
         if let tauri::WindowEvent::Moved(pos) = event {
             let scale = win2.scale_factor().unwrap_or(1.0);
             let logical: tauri::LogicalPosition<f64> = pos.to_logical(scale);
-            save_position(&app2, &id, logical.x, logical.y);
+            let n = moves.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+            let (app3, id, moves) = (app2.clone(), id.clone(), moves.clone());
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                if moves.load(std::sync::atomic::Ordering::SeqCst) == n {
+                    save_position(&app3, &id, logical.x, logical.y);
+                }
+            });
         }
     });
     Ok(())
