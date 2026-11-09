@@ -188,9 +188,9 @@ Function PageReinstall
     IntOp $0 $0 + 1
     ReadRegStr $R0 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$1" "DisplayName"
     ReadRegStr $R1 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$1" "Publisher"
-    ; PDF.dk: only this app's own MSI under its old name (LEGACYNAME, nsis/hooks.nsh) – the
-    ; product name alone could be the other app's old name. No MSI is made any more.
-    StrCmp "$R0$R1" "${LEGACYNAME}${MANUFACTURER}" 0 wix_loop
+    ; PDF.dk: only this app's own MSI under its current name (PDF.dk Flow). The old name,
+    ; PDF.dk Desktop, is the other app's name today, so it is deliberately not matched.
+    StrCmp "$R0$R1" "${PRODUCTNAME}${MANUFACTURER}" 0 wix_loop
     ReadRegStr $R0 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$1" "UninstallString"
     ${StrCase} $R1 $R0 "L"
     ${StrLoc} $R0 $R1 "msiexec" ">"

@@ -60,10 +60,11 @@ jobs:
           # one Mac build that runs natively on Apple Silicon and Intel
           - platform: 'macos-latest'
             args: '--target universal-apple-darwin'
-          # Windows: the .exe installer only. The MSI went with the rename (its upgrade identity came
-          # from the product name); an MSI install is replaced by the .exe one (nsis/installer.nsi).
+          # Windows: the .exe installer (NSIS) and, since 0.6.4, the MSI again for central rollout
+          # (Intune / Group Policy). The MSI's upgrade identity is now a fixed upgradeCode in
+          # tauri.conf.json (bundle.windows.wix), so a rename can no longer break upgrades.
           - platform: 'windows-latest'
-            args: '--bundles nsis'
+            args: '--bundles nsis,msi'
 
     runs-on: ${{ matrix.platform }}
     env:
