@@ -137,12 +137,25 @@ pub enum OutputMode {
 
 // ------------------------------------------------------------ catalogue
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[derive(Debug, Clone, Serialize, Default, PartialEq)]
 pub struct Bilingual {
-    #[serde(default)]
     pub da: String,
-    #[serde(default)]
     pub en: String,
+}
+
+/// `{"da": …, "en": …}`, or a plain string (the same in both languages, e.g. a choice "A4"),
+/// or null. Anything else must not cost the whole catalogue.
+impl<'de> Deserialize<'de> for Bilingual {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        Ok(match serde_json::Value::deserialize(d)? {
+            serde_json::Value::String(s) => Bilingual { da: s.clone(), en: s },
+            serde_json::Value::Object(m) => {
+                let get = |k: &str| m.get(k).and_then(|v| v.as_str()).unwrap_or_default().to_string();
+                Bilingual { da: get("da"), en: get("en") }
+            }
+            _ => Bilingual::default(),
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

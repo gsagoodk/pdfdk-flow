@@ -189,7 +189,9 @@ struct CatalogResponse {
 struct CatalogData {
     version: Option<String>,
     generated_at: Option<String>,
-    tools: Vec<ToolDefinition>,
+    /// Each tool on its own: one the app can't read is left out, not the whole catalogue
+    /// (a fresh install would otherwise show only the two built-in tools).
+    tools: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -354,7 +356,18 @@ impl PdfDkClient {
             return Err(ApiError::ServerError(parsed.message.unwrap_or_else(|| "catalogue refused".into())));
         }
         let data = parsed.data.ok_or_else(|| ApiError::ServerError("catalogue empty".into()))?;
-        Ok(CatalogCache { version: data.version, fetched_at: data.generated_at, tools: data.tools })
+        let tools: Vec<ToolDefinition> = data
+            .tools
+            .into_iter()
+            .filter_map(|t| {
+                let id = t.get("id").and_then(|v| v.as_str()).unwrap_or("?").to_string();
+                serde_json::from_value(t).map_err(|e| tracing::warn!("Catalogue: skipped tool {}: {}", id, e)).ok()
+            })
+            .collect();
+        if tools.is_empty() {
+            return Err(ApiError::ServerError("catalogue empty".into()));
+        }
+        Ok(CatalogCache { version: data.version, fetched_at: data.generated_at, tools })
     }
 
     /// Upload a file to a tool endpoint. Returns the job UUID for polling.
@@ -610,5 +623,37 @@ impl PdfDkClient {
             return Err(ApiError::ServerError(usage_response.message.unwrap_or_else(|| "Unknown error".to_string())));
         }
         usage_response.data.ok_or(ApiError::ServerError("No usage data returned".to_string()))
+    }
+}
+
+#[cfg(test)]
+mod catalogue_tests {
+    use super::*;
+
+    #[test]
+    fn plain_string_labels_and_bad_tools_dont_cost_the_catalogue() {
+        let body = r#"{"success":true,"data":{"version":"x","generated_at":null,"tools":[
+            {"id":"split-spreads","endpoint":"/api/split-spreads","name":{"da":"Opdel opslag","en":"Split spreads"},
+             "options":[{"name":"tile_mm","type":"select","choices":[{"value":"210x297","label":"A4"}]}]},
+            {"id":"broken","endpoint":42},
+            {"id":"compress","endpoint":"/api/compress"}]}}"#;
+        let parsed: CatalogResponse = serde_json::from_str(body).unwrap();
+        let tools: Vec<ToolDefinition> =
+            parsed.data.unwrap().tools.into_iter().filter_map(|t| serde_json::from_value(t).ok()).collect();
+        assert_eq!(tools.iter().map(|t| t.id.as_str()).collect::<Vec<_>>(), ["split-spreads", "compress"]);
+        assert_eq!(tools[0].options[0].choices[0].label.da, "A4");
+        assert_eq!(tools[0].options[0].choices[0].label.en, "A4");
+    }
+
+    /// The live catalogue: `CATALOGUE_JSON=path cargo test live_catalogue -- --ignored`
+    #[test]
+    #[ignore]
+    fn live_catalogue() {
+        let body = std::fs::read_to_string(std::env::var("CATALOGUE_JSON").unwrap()).unwrap();
+        let parsed: CatalogResponse = serde_json::from_str(&body).unwrap();
+        let all = parsed.data.unwrap().tools;
+        let n = all.len();
+        let ok = all.into_iter().filter_map(|t| serde_json::from_value::<ToolDefinition>(t).ok()).count();
+        assert_eq!(ok, n);
     }
 }
