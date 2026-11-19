@@ -23,6 +23,8 @@ const config = ref<AppConfig | null>(null);
 const tools = ref<ToolDefinition[]>([]);
 const toolsLoading = ref(false);
 const view = ref<View>("tools");
+/** A widget's gear asked for its tool's settings (widgets/mod.rs widget_open_options). */
+const openOptions = ref("");
 const siteBase = ref("https://pdf.dk");
 const version = ref("");
 const update = ref<Update | null>(null);
@@ -198,6 +200,10 @@ onMounted(async () => {
   if (signedIn.value) await afterSignIn();
   loading.value = false;
   // pdf.dk refused a job for the plan or the seat: the Rust side has read the licence again
+  await listen<string>("open-tool-options", (e) => {
+    view.value = "tools";
+    openOptions.value = e.payload;
+  });
   unlistenAuth = await listen("auth-changed", async () => (auth.value = await invoke<AuthState>("get_auth_state")));
   checkForUpdates().then(async (found) => {
     if (found && (await invoke<boolean>("auto_update_test").catch(() => false))) {
@@ -294,6 +300,8 @@ onBeforeUnmount(() => {
           :config="config"
           :loading="toolsLoading"
           :site-base="siteBase"
+          :open-options="openOptions"
+          @options-opened="openOptions = ''"
           @reload="loadTools(true)"
           @config-changed="loadConfig"
         />

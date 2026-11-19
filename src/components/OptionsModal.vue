@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { t, bi } from "../i18n";
 import type { ToolDefinition, ToolOption } from "../types";
 
-const props = defineProps<{ tool: ToolDefinition; values: Record<string, unknown>; entryKey?: string | null }>();
+const props = defineProps<{ tool: ToolDefinition; values: Record<string, unknown>; entryKey?: string | null; scope?: string }>();
 const emit = defineEmits<{ (e: "close"): void; (e: "saved"): void }>();
 
 // start from the schema defaults, then whatever the user saved
@@ -70,6 +70,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey, true));
         <button class="md-x" :aria-label="t('close')" @click="emit('close')">×</button>
       </div>
       <div class="md-b">
+        <p v-if="scope" class="md-scope">{{ scope }}</p>
         <p v-if="!visible.length" class="md-empty">{{ t("noOptions") }}</p>
         <div v-for="o in visible" :key="o.name" class="field">
           <template v-if="o.type === 'boolean'">
@@ -115,6 +116,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey, true));
 </template>
 
 <style scoped>
+.md-scope { margin: 0 0 14px; font-size: 12.5px; line-height: 1.45; color: var(--text2); }
 .ov { position: fixed; inset: 0; background: rgba(15, 17, 23, .45); display: grid; place-items: center; z-index: 50; }
 .md { background: var(--panel); width: 440px; max-width: calc(100vw - 40px); max-height: calc(100vh - 60px); display: flex; flex-direction: column; }
 .md-h { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 12px; border-bottom: 1px solid var(--cardline); }

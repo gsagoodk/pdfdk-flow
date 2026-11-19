@@ -133,6 +133,7 @@ function dragAll() {
 function clear() { results.value = null; }
 async function remove() { await invoke("widget_remove", { id }).catch(() => {}); }
 function openMain() { invoke("widget_show_main").catch(() => {}); }
+function openOptions() { invoke("widget_open_options", { id }).catch(() => {}); }
 
 let unDrag: UnlistenFn | null = null;
 let unAuth: UnlistenFn | null = null;
@@ -169,6 +170,9 @@ onBeforeUnmount(() => {
     <div class="w-head" data-tauri-drag-region>
       <span class="w-dot" data-tauri-drag-region></span>
       <span class="w-name" data-tauri-drag-region>{{ tool ? bi(tool.name) : "PDF.dk" }}</span>
+      <button v-if="tool && tool.options.some((o) => o.type !== 'hidden')" class="w-x w-gear" :title="t('widgetSettings')" :aria-label="t('widgetSettings')" @click="openOptions">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
       <button class="w-x" :title="t('widgetRemove')" @click="remove">×</button>
     </div>
 
@@ -248,6 +252,8 @@ html[data-os="windows"][data-theme="dark"] .w.over { background: color-mix(in sr
 .w-name { font-size: 12.5px; font-weight: 800; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
 .w-x { width: 20px; height: 20px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 15px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity .12s; flex: none; }
 .w:hover .w-x { opacity: 1; }
+.w-gear { display: grid; place-items: center; padding: 0; }
+.w-gear svg { width: 13px; height: 13px; }
 .w-x:hover { background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); }
 
 .w-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }

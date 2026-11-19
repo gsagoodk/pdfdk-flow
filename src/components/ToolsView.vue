@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -7,12 +7,34 @@ import { t, bi } from "../i18n";
 import { CATEGORY_ORDER, CATEGORY_VAR, type AppConfig, type ToolConfig, type ToolDefinition, type WidgetConfig } from "../types";
 import OptionsModal from "./OptionsModal.vue";
 
-const props = defineProps<{ tools: ToolDefinition[]; config: AppConfig | null; loading: boolean; siteBase: string }>();
-const emit = defineEmits<{ (e: "reload"): void; (e: "config-changed"): void }>();
+const props = defineProps<{ tools: ToolDefinition[]; config: AppConfig | null; loading: boolean; siteBase: string; openOptions?: string }>();
+const emit = defineEmits<{ (e: "reload"): void; (e: "config-changed"): void; (e: "options-opened"): void }>();
 
 const query = ref("");
 const onlyEnabled = ref(false);
-const optionsFor = ref<{ tool: ToolDefinition; entry: ToolConfig | null; widget?: WidgetConfig } | null>(null);
+const optionsFor = ref<{ tool: ToolDefinition; entry: ToolConfig | null; widget?: WidgetConfig; all?: boolean } | null>(null);
+/** The gear on a tool's card: its settings for every folder and widget of it, and drag and drop. */
+function openToolOptions(tool: ToolDefinition) {
+  optionsFor.value = { tool, entry: null, all: true };
+}
+/** Where the tool's settings will apply, for the line at the top of the dialog. */
+function toolScope(tool: ToolDefinition): string {
+  const f = entries(tool.id).length, w = widgets.value.filter((x) => x.toolId === tool.id).length;
+  if (!f && !w) return t("toolOptionsScopeNone");
+  const where = [f === 1 ? t("scopeFolder") : f ? t("scopeFolders", { n: f }) : "", w === 1 ? t("scopeWidget") : w ? t("scopeWidgets", { n: w }) : "", t("scopeDrop")].filter(Boolean).join(", ");
+  return t("toolOptionsScope", { where });
+}
+// A widget's gear (App.vue passes the tool on): its tool's settings open here.
+watch(
+  () => [props.openOptions, props.tools.length] as const,
+  ([id]) => {
+    const tool = id ? props.tools.find((x) => x.id === id) : undefined;
+    if (!tool) return;
+    openToolOptions(tool);
+    emit("options-opened");
+  },
+  { immediate: true },
+);
 const widgetNotice = ref("");
 
 // ---- desktop widgets (0.4.0)
@@ -188,7 +210,7 @@ async function disable(tool: ToolDefinition, entry: ToolConfig) {
           </label>
           <div class="tw-actions">
             <button class="btn btn-sm btn-ghost" @click="showWidget(w)">{{ t("widgetShow") }}</button>
-            <button v-if="widgetTool(w) && visibleOptions(widgetTool(w)!).length" class="btn btn-sm btn-ghost" @click="optionsFor = { tool: widgetTool(w)!, entry: null, widget: w }">{{ t("options") }}</button>
+            <button v-if="widgetTool(w) && visibleOptions(widgetTool(w)!).length" class="btn btn-sm btn-ghost" :title="t('widgetOptionsOwn')" @click="optionsFor = { tool: widgetTool(w)!, entry: null, widget: w }">{{ t("options") }}</button>
             <button class="btn btn-sm btn-ghost tw-remove" @click="removeWidget(w)">{{ t("removeFolder") }}</button>
           </div>
         </div>
@@ -205,7 +227,7 @@ async function disable(tool: ToolDefinition, entry: ToolConfig) {
               <h4 class="tc-name">{{ bi(tool.name) }}</h4>
               <p class="tc-desc">{{ bi(tool.description) }}</p>
             </div>
-            <button v-if="visibleOptions(tool).length && !isEnabled(tool.id)" class="tc-gear" :title="t('defaultOptions')" @click="optionsFor = { tool, entry: null }">
+            <button v-if="visibleOptions(tool).length" class="tc-gear" :title="t('toolOptions')" @click="openToolOptions(tool)">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
             </button>
           </div>
@@ -259,7 +281,8 @@ async function disable(tool: ToolDefinition, entry: ToolConfig) {
       v-if="optionsFor"
       :tool="optionsFor.tool"
       :values="optionsFor.widget?.options || optionsFor.entry?.options || defaultOptions(optionsFor.tool.id)"
-      :entry-key="optionsFor.widget ? 'widget:' + optionsFor.widget.id : (optionsFor.entry?.key ?? null)"
+      :entry-key="optionsFor.all ? 'tool:all' : optionsFor.widget ? 'widget:' + optionsFor.widget.id : (optionsFor.entry?.key ?? null)"
+      :scope="optionsFor.all ? toolScope(optionsFor.tool) : undefined"
       @close="optionsFor = null"
       @saved="optionsFor = null; emit('config-changed')"
     />

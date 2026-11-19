@@ -583,6 +583,36 @@ async fn update_tool_options(app: AppHandle, state: tauri::State<'_, AppState>, 
     if let Some(id) = key.as_deref().and_then(|k| k.strip_prefix("widget:")) {
         return widgets::widget_update(app, state, id.to_string(), options, None).await;
     }
+    // The tool's own settings (the gear on its card): every watched folder and every widget of
+    // the tool gets them – one place to set a tool up, wherever it is used.
+    if key.as_deref() == Some("tool:all") {
+        let def = { let cat = state.catalog.read().await; cat.iter().find(|t| t.id == tool_id).cloned() };
+        let mut config = state.config.write().await;
+        let mut any = false;
+        for tc in config.tools.iter_mut().filter(|t| t.id == tool_id) {
+            tc.options = options.clone();
+            any = true;
+        }
+        if !any {
+            let Some(def) = def else { return Err(format!("Unknown tool: {}", tool_id)) };
+            config.tools.push(ToolConfig {
+                id: def.id.clone(), key: def.id.clone(), enabled: false, folder_path: None, output_mode: config::OutputMode::Subfolder,
+                options: options.clone(), endpoint: Some(def.endpoint.clone()), file_field: Some(def.file_field.clone()),
+                accepts: def.accepts.clone(), output: Some(def.output.clone()), name: Some(def.name.clone()),
+            });
+        }
+        let mut changed = Vec::new();
+        for w in config.widgets.iter_mut().filter(|w| w.tool_id == tool_id) {
+            w.options = options.clone();
+            changed.push(w.id.clone());
+        }
+        config::save_config(&config).map_err(|e| e.to_string())?;
+        drop(config);
+        for id in changed {
+            let _ = app.emit_to(widgets::label(&id), "widget-changed", ());
+        }
+        return Ok(());
+    }
     let mut config = state.config.write().await;
     let found = match key.as_deref() {
         Some(k) => config.tools.iter_mut().find(|t| t.key == k),
@@ -1038,6 +1068,7 @@ pub fn run() {
             widgets::widget_update,
             widgets::widget_process,
             widgets::widget_show_main,
+            widgets::widget_open_options,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

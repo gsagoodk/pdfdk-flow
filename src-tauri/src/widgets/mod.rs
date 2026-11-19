@@ -319,6 +319,15 @@ pub async fn widget_process(app: AppHandle, state: tauri::State<'_, AppState>, i
     Ok(run_files(&app, &state, tc, &lang, paths, widget.combine, Some(&target)).await)
 }
 
+/// The gear on a widget: the main window comes forward with the tool's settings open.
+#[tauri::command]
+pub async fn widget_open_options(app: AppHandle, state: tauri::State<'_, AppState>, id: String) -> Result<(), String> {
+    let tool_id = state.config.read().await.widgets.iter().find(|w| w.id == id).map(|w| w.tool_id.clone()).ok_or_else(|| format!("Unknown widget: {}", id))?;
+    crate::show_main(&app);
+    let _ = app.emit_to("main", "open-tool-options", tool_id);
+    Ok(())
+}
+
 #[tauri::command]
 pub fn widget_show_main(app: AppHandle) {
     crate::show_main(&app);

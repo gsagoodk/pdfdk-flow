@@ -77,7 +77,7 @@ const handlers: Record<string, Handler> = {
     if (others) config.tools.splice(i, 1); else config.tools[i].enabled = false;
     return null;
   },
-  update_tool_options: ({ toolId, options, key }) => { const t = key ? config.tools.find((x) => x.key === key) : config.tools.find((x) => x.id === toolId); if (t) t.options = options; return null; },
+  update_tool_options: ({ toolId, options, key }) => { if (key === "tool:all") { for (const x of config.tools) if (x.id === toolId) x.options = options; for (const w of config.widgets) if (w.toolId === toolId) w.options = options; return null; } const t = key ? config.tools.find((x) => x.key === key) : config.tools.find((x) => x.id === toolId); if (t) t.options = options; return null; },
   process_files: async ({ paths, combine }) => { await new Promise((r) => setTimeout(r, 1200)); if (combine && paths.length > 1) return [{ input: paths.join(", "), output: paths[0].replace(/(\.[^.]+)$/, "_samlet.pdf"), error: null }]; return paths.map((p: string) => ({ input: p, output: p.replace(/(\.[^.]+)$/, "_tool$1"), error: null })); },
   get_jobs: () => jobs,
   start_browser_login: () => "https://dev.pdf.dk/flow-login?state=mock",
@@ -85,6 +85,8 @@ const handlers: Record<string, Handler> = {
   update_tool_output: ({ key, mode, path }) => { const t = config.tools.find((x) => x.key === key); if (t) t.outputMode = mode === "custom" ? { custom: path } : mode === "same" ? "same-folder" : "subfolder"; return null; },
   retry_job: async ({ jobId }) => { const j = jobs.find((x) => x.id === jobId); await new Promise((r) => setTimeout(r, 800)); if (j) { j.status = "completed"; j.error = null; j.outputFile = j.inputFile.replace(/(\.[^.]+)$/, "_retry$1"); } return null; },
   log_client: () => null,
+  seat_status: () => ({ state: "here" }),
+  seat_activate: () => ({ state: "here" }),
   auto_update_test: () => false,
   get_logs: () => ["[12:00:01] Tools catalogue 2026-09-20 loaded: 38 tools", "[12:00:02] Watching /Users/demo/PDF.dk/Komprimer for compress"],
   clear_logs: () => null,
